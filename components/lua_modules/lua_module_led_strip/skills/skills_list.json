@@ -1,0 +1,13 @@
+{
+  "skills": [
+    {
+      "id": "lua_module_led_strip",
+      "file": "lua_module_led_strip.md",
+      "title": "lua_module_led_strip",
+      "summary": "How to create and control an LED strip from Lua.",
+      "cap_groups": [
+        "cap_lua"
+      ]
+    }
+  ]
+}

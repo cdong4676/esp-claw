@@ -3,7 +3,7 @@
 Use this skill when the user wants to see existing Lua scripts, run one, or inspect async execution jobs.
 
 ## Command Rule
-- The LLM should call Lua through the direct capability execute entrypoints.
+- The LLM should call Lua through the direct capability execute entrypoints, not through `cap_cli`.
 - Use `lua_list_scripts` to inspect scripts.
 - Use `lua_run_script` for synchronous execution.
 - Use `lua_run_script_async` for long-running or continuous scripts.
