@@ -26,6 +26,10 @@ static esp_err_t cap_scheduler_execute_get(const char *input_json,
                                            const claw_cap_call_context_t *ctx,
                                            char *output,
                                            size_t output_size);
+static esp_err_t cap_scheduler_execute_add(const char *input_json,
+                                           const claw_cap_call_context_t *ctx,
+                                           char *output,
+                                           size_t output_size);
 static esp_err_t cap_scheduler_execute_enable(const char *input_json,
                                               const claw_cap_call_context_t *ctx,
                                               char *output,
@@ -58,6 +62,7 @@ static const claw_cap_descriptor_t s_scheduler_descriptors[] = {
         .family = "scheduler",
         .description = "List all scheduler entries and runtime state.",
         .kind = CLAW_CAP_KIND_HYBRID,
+        .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\"}",
         .execute = cap_scheduler_execute_list,
     },
@@ -71,11 +76,23 @@ static const claw_cap_descriptor_t s_scheduler_descriptors[] = {
         .execute = cap_scheduler_execute_get,
     },
     {
+        .id = "scheduler_add",
+        .name = "scheduler_add",
+        .family = "scheduler",
+        .description = "Add one scheduler entry from JSON definition and return runtime state.",
+        .kind = CLAW_CAP_KIND_HYBRID,
+        .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
+        .input_schema_json =
+        "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"},\"enabled\":{\"type\":\"boolean\"},\"kind\":{\"type\":\"string\",\"enum\":[\"once\",\"interval\",\"cron\"]},\"timezone\":{\"type\":\"string\"},\"start_at_ms\":{\"type\":\"integer\"},\"end_at_ms\":{\"type\":\"integer\"},\"interval_ms\":{\"type\":\"integer\"},\"cron_expr\":{\"type\":\"string\"},\"event_type\":{\"type\":\"string\"},\"event_key\":{\"type\":\"string\"},\"source_channel\":{\"type\":\"string\"},\"chat_id\":{\"type\":\"string\"},\"content_type\":{\"type\":\"string\"},\"session_policy\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"},\"payload_json\":{\"type\":\"string\"},\"max_runs\":{\"type\":\"integer\"}},\"required\":[\"id\",\"kind\"]}",
+        .execute = cap_scheduler_execute_add,
+    },
+    {
         .id = "scheduler_enable",
         .name = "scheduler_enable",
         .family = "scheduler",
         .description = "Enable one scheduler entry by id.",
         .kind = CLAW_CAP_KIND_HYBRID,
+        .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[\"id\"]}",
         .execute = cap_scheduler_execute_enable,
     },
@@ -85,6 +102,7 @@ static const claw_cap_descriptor_t s_scheduler_descriptors[] = {
         .family = "scheduler",
         .description = "Disable one scheduler entry by id.",
         .kind = CLAW_CAP_KIND_HYBRID,
+        .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[\"id\"]}",
         .execute = cap_scheduler_execute_disable,
     },
@@ -94,6 +112,7 @@ static const claw_cap_descriptor_t s_scheduler_descriptors[] = {
         .family = "scheduler",
         .description = "Pause one scheduler entry by id.",
         .kind = CLAW_CAP_KIND_HYBRID,
+        .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[\"id\"]}",
         .execute = cap_scheduler_execute_pause,
     },
@@ -103,6 +122,7 @@ static const claw_cap_descriptor_t s_scheduler_descriptors[] = {
         .family = "scheduler",
         .description = "Resume one scheduler entry by id.",
         .kind = CLAW_CAP_KIND_HYBRID,
+        .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[\"id\"]}",
         .execute = cap_scheduler_execute_resume,
     },
@@ -112,6 +132,7 @@ static const claw_cap_descriptor_t s_scheduler_descriptors[] = {
         .family = "scheduler",
         .description = "Trigger one scheduler entry immediately.",
         .kind = CLAW_CAP_KIND_HYBRID,
+        .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\",\"properties\":{\"id\":{\"type\":\"string\"}},\"required\":[\"id\"]}",
         .execute = cap_scheduler_execute_trigger,
     },
@@ -121,6 +142,7 @@ static const claw_cap_descriptor_t s_scheduler_descriptors[] = {
         .family = "scheduler",
         .description = "Reload scheduler definitions from disk.",
         .kind = CLAW_CAP_KIND_HYBRID,
+        .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
         .input_schema_json = "{\"type\":\"object\"}",
         .execute = cap_scheduler_execute_reload,
     },
@@ -1190,6 +1212,27 @@ static esp_err_t cap_scheduler_execute_get(const char *input_json,
                         TAG,
                         "scheduler id required");
     return cap_scheduler_get_state_json(id, output, output_size);
+}
+
+static esp_err_t cap_scheduler_execute_add(const char *input_json,
+                                           const claw_cap_call_context_t *ctx,
+                                           char *output,
+                                           size_t output_size)
+{
+    cap_scheduler_item_t item = {0};
+    const char *default_timezone = NULL;
+
+    (void)ctx;
+
+    default_timezone = s_cap_scheduler.default_timezone[0] ?
+                       s_cap_scheduler.default_timezone : CAP_SCHEDULER_DEFAULT_TIMEZONE;
+    ESP_RETURN_ON_ERROR(cap_scheduler_parse_item_json_string(input_json ? input_json : "{}",
+                                                             &item,
+                                                             default_timezone),
+                        TAG,
+                        "scheduler add input invalid");
+    ESP_RETURN_ON_ERROR(cap_scheduler_add(&item), TAG, "scheduler add failed");
+    return cap_scheduler_get_state_json(item.id, output, output_size);
 }
 
 static esp_err_t cap_scheduler_execute_enable(const char *input_json,

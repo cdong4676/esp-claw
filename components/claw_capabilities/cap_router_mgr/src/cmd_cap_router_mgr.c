@@ -155,21 +155,33 @@ static esp_err_t event_router_prepare_argv(int argc,
 
 static int call_router_mgr_cap(const char *cap_name, const char *input_json)
 {
-    char output[CMD_CAP_ROUTER_MGR_OUTPUT_SIZE] = {0};
+    char *output = NULL;
     claw_cap_call_context_t ctx = {
         .caller = CLAW_CAP_CALLER_CONSOLE,
         .session_id = "default",
     };
     esp_err_t err;
+    int rc = 1;
 
-    err = claw_cap_call(cap_name, input_json, &ctx, output, sizeof(output));
+    output = calloc(1, CMD_CAP_ROUTER_MGR_OUTPUT_SIZE);
+    if (!output) {
+        printf("Out of memory\n");
+        return 1;
+    }
+
+    err = claw_cap_call(cap_name, input_json, &ctx, output, CMD_CAP_ROUTER_MGR_OUTPUT_SIZE);
     if (err == ESP_OK) {
         printf("%s\n", output);
-        return 0;
+        rc = 0;
+        goto cleanup;
     }
 
     printf("%s\n", output[0] ? output : esp_err_to_name(err));
-    return 1;
+    rc = 1;
+
+cleanup:
+    free(output);
+    return rc;
 }
 
 static char *build_id_json(const char *id)

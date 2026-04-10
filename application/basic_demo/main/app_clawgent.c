@@ -121,7 +121,7 @@ static esp_err_t init_skills(void)
 static esp_err_t init_capabilities(const basic_demo_settings_t *settings)
 {
     claw_cap_config_t cap_config = {
-        .max_capabilities = 48,
+        .max_capabilities = 64,
         .max_groups = 20,
     };
 
@@ -247,6 +247,9 @@ static esp_err_t init_capabilities(const basic_demo_settings_t *settings)
     ESP_RETURN_ON_ERROR(cap_web_search_register_group(),
                         TAG,
                         "Failed to register web search cap");
+    ESP_RETURN_ON_ERROR(cap_router_mgr_register_group(),
+                        TAG,
+                        "Failed to register router manager cap");
     ESP_RETURN_ON_ERROR(cap_session_mng_register_group(),
                         TAG,
                         "Failed to register session manager cap");
