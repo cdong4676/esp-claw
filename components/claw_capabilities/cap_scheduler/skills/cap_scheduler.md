@@ -34,7 +34,6 @@ Use this skill when the user needs to inspect or control timer-based schedule ru
 - `id`: schedule unique id.
 - `enabled`: whether schedule is active. Defaults to `true`.
 - `kind`: `once`, `interval`, or `cron`.
-- `timezone`: POSIX timezone string used for cron and wall-clock interpretation.
 - `start_at_ms`: absolute Unix timestamp in milliseconds. Required for `once`;
   optional anchor for `interval`. Use `0` when no anchor is needed.
 - `end_at_ms`: optional absolute stop time in milliseconds. `0` means no stop
@@ -63,9 +62,9 @@ Use this skill when the user needs to inspect or control timer-based schedule ru
   `start_at_ms` is set, it is used as the interval anchor.
 - Choose `cron` for calendar-based repeated execution, such as "every day at
   08:00", "every Monday", "on the 1st day of each month", or "every 3 minutes
-  aligned to wall-clock time". `cron` depends on valid wall-clock time. Supported
-  field forms are `*`, `*/N`, or one explicit number in range; for example,
-  `*/3 * * * *`.
+  aligned to wall-clock time". `cron` uses the device time zone stored in NVS
+  and depends on valid wall-clock time. Supported field forms are
+  `*`, `*/N`, or one explicit number in range; for example, `*/3 * * * *`.
 - Choose `once` for one-time execution at a specific absolute time, such as a
   deadline. `start_at_ms` is required and valid time sync is required.
 
@@ -121,8 +120,6 @@ Use this skill when the user needs to inspect or control timer-based schedule ru
    wake-up.
 4. Add one scheduler entry with a stable `event_key`.
 5. Add or update the matching router rule in `cap_router_mgr`.
-6. Trigger once with `scheduler_trigger_now`, or wait one cycle, then verify with
-   `scheduler_get` and the router rule state.
 
 ## Common failure causes
 - Adding only the schedule and forgetting the matching router rule.
@@ -143,7 +140,7 @@ Scheduler entry: trigger every 30 seconds, 3 times in total.
 
 ```json
 {
-  "schedule_json": "{\"id\":\"drink_reminder_30s\",\"enabled\":true,\"kind\":\"interval\",\"timezone\":\"UTC0\",\"start_at_ms\":0,\"end_at_ms\":0,\"interval_ms\":30000,\"cron_expr\":\"\",\"event_type\":\"schedule\",\"event_key\":\"drink_reminder\",\"source_channel\":\"time\",\"chat_id\":\"a_certain_QQ_chat_ID\",\"content_type\":\"trigger\",\"session_policy\":\"trigger\",\"text\":\"drink reminder tick\",\"payload_json\":\"{\\\"message\\\":\\\"time to drink water\\\"}\",\"max_runs\":3}"
+  "schedule_json": "{\"id\":\"drink_reminder_30s\",\"enabled\":true,\"kind\":\"interval\",\"start_at_ms\":0,\"end_at_ms\":0,\"interval_ms\":30000,\"cron_expr\":\"\",\"event_type\":\"schedule\",\"event_key\":\"drink_reminder\",\"source_channel\":\"time\",\"chat_id\":\"a_certain_QQ_chat_ID\",\"content_type\":\"trigger\",\"session_policy\":\"trigger\",\"text\":\"drink reminder tick\",\"payload_json\":\"{\\\"message\\\":\\\"time to drink water\\\"}\",\"max_runs\":3}"
 }
 ```
 
@@ -161,7 +158,7 @@ Scheduler entry: trigger every day at 08:00 and publish a schedule event to make
 
 ```json
 {
-  "schedule_json": "{\"id\":\"daily_agent_check\",\"enabled\":true,\"kind\":\"cron\",\"timezone\":\"UTC0\",\"start_at_ms\":0,\"end_at_ms\":0,\"interval_ms\":0,\"cron_expr\":\"0 8 * * *\",\"event_type\":\"schedule\",\"event_key\":\"daily_agent_check\",\"source_channel\":\"time\",\"chat_id\":\"a_certain_QQ_chat_ID\",\"content_type\":\"trigger\",\"session_policy\":\"trigger\",\"text\":\"Please check the weather today and tell me what I should prepare for going out.\",\"payload_json\":\"{}\",\"max_runs\":0}"
+  "schedule_json": "{\"id\":\"daily_agent_check\",\"enabled\":true,\"kind\":\"cron\",\"start_at_ms\":0,\"end_at_ms\":0,\"interval_ms\":0,\"cron_expr\":\"0 8 * * *\",\"event_type\":\"schedule\",\"event_key\":\"daily_agent_check\",\"source_channel\":\"time\",\"chat_id\":\"a_certain_QQ_chat_ID\",\"content_type\":\"trigger\",\"session_policy\":\"trigger\",\"text\":\"Please check the weather today and tell me what I should prepare for going out.\",\"payload_json\":\"{}\",\"max_runs\":0}"
 }
 ```
 
