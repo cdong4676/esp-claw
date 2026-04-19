@@ -432,7 +432,7 @@ const llmProviderPresets = {
 
 const llmProviderDefaultModels = {
   openai: "gpt-5.4",
-  qwen: "qwen-3.6",
+  qwen: "qwen3.6-plus",
   anthropic: "claude-sonnet-4-6",
 };
 
