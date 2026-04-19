@@ -122,14 +122,49 @@ struct claw_core_response {
     char *error_message;
 };
 
+/*
+ * Diagnostic snapshot of one fully completed claw_core request, fired once
+ * per request after the LLM produces a final assistant message (success path
+ * only). Observers are intended for telemetry / honesty checks; they MUST NOT
+ * mutate state or block the worker beyond a few milliseconds.
+ *
+ * Both CSV strings are comma-separated, never NULL, always NUL-terminated
+ * (may be empty). Names in tool_calls_csv preserve invocation order and are
+ * NOT deduped. Names in context_providers_csv are deduped.
+ */
+typedef struct {
+    uint32_t request_id;
+    const char *session_id;            /* may be NULL */
+    const char *final_text;            /* may be NULL or empty */
+    const char *context_providers_csv; /* providers that injected non-empty content */
+    const char *tool_calls_csv;        /* tool calls invoked across all rounds */
+} claw_core_completion_summary_t;
+
+typedef void (*claw_core_completion_observer_fn)(const claw_core_completion_summary_t *summary,
+                                                 void *user_ctx);
+
 esp_err_t claw_core_init(const claw_core_config_t *config);
 esp_err_t claw_core_start(void);
 esp_err_t claw_core_add_context_provider(const claw_core_context_provider_t *provider);
+esp_err_t claw_core_add_completion_observer(claw_core_completion_observer_fn observer,
+                                            void *user_ctx);
 esp_err_t claw_core_call_cap(const char *cap_name,
                              const char *input_json,
                              const claw_core_request_t *request,
                              char **out_output);
 esp_err_t claw_core_submit(const claw_core_request_t *request, uint32_t timeout_ms);
+/*
+ * Cooperatively abort the in-flight LLM request held by the worker task.
+ *
+ * `request_id == 0` cancels whatever is currently in flight (panic-stop).
+ * Otherwise the cancel only fires when the in-flight id matches, which lets
+ * callers safely retry from a stale id without disturbing newer rounds.
+ *
+ * Returns ESP_OK if a cancel was armed, ESP_ERR_NOT_FOUND if no matching
+ * request is in flight. The actual unwind is asynchronous; the worker
+ * publishes a normal response with error_message="request cancelled".
+ */
+esp_err_t claw_core_cancel_request(uint32_t request_id);
 esp_err_t claw_core_receive(claw_core_response_t *response, uint32_t timeout_ms);
 esp_err_t claw_core_receive_for(uint32_t request_id,
                                 claw_core_response_t *response,
