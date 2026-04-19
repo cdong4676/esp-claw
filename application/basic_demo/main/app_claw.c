@@ -44,6 +44,7 @@ static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
     "cap_files",
     "cap_skill",
     "cap_system",
+    "cap_lua",
     "claw_memory",
 };
 #else
@@ -51,6 +52,7 @@ static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
     "cap_files",
     "cap_skill",
     "cap_system",
+    "cap_lua",
 };
 #endif
 
@@ -64,6 +66,9 @@ static const char *const BASIC_DEMO_LLM_VISIBLE_GROUPS[] = {
     "Skills are user-facing functions, while Capabilities are internal functions used by the model.\n" \
     "After completing the task, call 'deactivete_skill' to keep the context streamlined and efficient." \
     "When communicating with the user, refer to skills instead of Capabilities. " \
+    "When the user asks to write, run, or fix Lua scripts, activate skills 'cap_lua_edit', 'cap_lua_run', and 'cap_lua_patterns' first and follow them. " \
+    "When Lua sends an IM reply via event_publisher, prefer ep.publish_message(\"text\") (string only); if you use a table, include source_cap and text or the script will error. " \
+    "When reading Lua script sources with read_file, use paths under scripts/ matching lua_list_scripts (e.g. scripts/temp/foo.lua), not the bare lua_list_scripts path. " \
     "If the user is defining or redesigning the assistant's persona, identity, role, behavior style, speech style, or standing profile, activate the 'profile_memory_ops' skill and prefer persistent profile updates over temporary roleplay when lasting intent is clear. " \
 
 #if CONFIG_BASIC_DEMO_MEMORY_MODE_FULL

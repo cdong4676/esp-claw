@@ -14,10 +14,15 @@
 #include "cJSON.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "lauxlib.h"
 #include "lualib.h"
 
 static const char *TAG = "cap_lua_rt";
+
+/** Hook cadence: lower count = more frequent deadline checks and yields (WDT-friendly). */
+#define CAP_LUA_HOOK_INSTRUCTION_COUNT 200
 
 typedef struct {
     char *buf;
@@ -65,7 +70,17 @@ static void cap_lua_push_json_value(lua_State *L, const cJSON *item)
         return;
     }
     if (cJSON_IsNumber(item)) {
-        lua_pushnumber(L, item->valuedouble);
+        /*
+         * Whole JSON numbers become Lua integers so tool args like pin=0 stay integer
+         * in Lua (avoids "0.0" in logs and subtle API mismatches).
+         */
+        lua_Number d = (lua_Number)item->valuedouble;
+        lua_Integer i;
+        if (lua_numbertointeger(d, &i) && (lua_Number)i == d) {
+            lua_pushinteger(L, i);
+        } else {
+            lua_pushnumber(L, d);
+        }
         return;
     }
     if (cJSON_IsString(item)) {
@@ -133,6 +148,8 @@ static void cap_lua_timeout_hook(lua_State *L, lua_Debug *ar)
     if (esp_timer_get_time() > ctx->deadline_us) {
         luaL_error(L, "execution timed out");
     }
+    /* Yield so tight Lua loops cannot starve IDLE / trigger the task WDT (see report P2-13). */
+    taskYIELD();
 }
 
 static void cap_lua_load_registered_modules(lua_State *L)
@@ -235,7 +252,7 @@ esp_err_t cap_lua_runtime_execute_file(const char *path, const char *args_json, 
     lua_pushlightuserdata(L, &ctx);
     lua_pushcclosure(L, cap_lua_print_capture, 1);
     lua_setglobal(L, "print");
-    lua_sethook(L, cap_lua_timeout_hook, LUA_MASKCOUNT, 1000);
+    lua_sethook(L, cap_lua_timeout_hook, LUA_MASKCOUNT, CAP_LUA_HOOK_INSTRUCTION_COUNT);
 
     status = luaL_dofile(L, path);
     cap_lua_run_runtime_cleanups();

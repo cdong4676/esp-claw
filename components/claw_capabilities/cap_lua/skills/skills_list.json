@@ -3,7 +3,7 @@
     {
       "id": "cap_lua_edit",
       "file": "cap_lua_edit.md",
-      "summary": "Rules for writing Lua scripts with the registered module skills and relative script paths.",
+      "summary": "Write Lua: batch-activate only needed lua_module_*; skip board_hardware unless unknown. read_file sources: scripts/+lua_list path. prefer ep.publish_message(\"text\").",
       "cap_groups": [
         "cap_lua"
       ]
@@ -11,7 +11,15 @@
     {
       "id": "cap_lua_run",
       "file": "cap_lua_run.md",
-      "summary": "Rules for listing, running, and inspecting managed Lua scripts and async jobs.",
+      "summary": "List/run Lua; read_file a script as scripts/<path from lua_list_scripts>. IM args often auto-injected.",
+      "cap_groups": [
+        "cap_lua"
+      ]
+    },
+    {
+      "id": "cap_lua_patterns",
+      "file": "cap_lua_patterns.md",
+      "summary": "Canonical Lua templates (xpcall, cleanup, delay in loops). Button+IM: string publish_message in callbacks.",
       "cap_groups": [
         "cap_lua"
       ]

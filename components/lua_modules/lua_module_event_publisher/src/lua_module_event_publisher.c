@@ -49,6 +49,30 @@ static const char *lua_table_get_string_field(lua_State *L,
     return value;
 }
 
+static bool lua_global_args_copy_string(lua_State *L,
+                                       const char *field_name,
+                                       char *dst,
+                                       size_t dst_size)
+{
+    if (!dst || dst_size == 0) {
+        return false;
+    }
+    dst[0] = '\0';
+    lua_getglobal(L, "args");
+    if (!lua_istable(L, -1)) {
+        lua_pop(L, 1);
+        return false;
+    }
+    lua_getfield(L, -1, field_name);
+    if (lua_type(L, -1) != LUA_TSTRING) {
+        lua_pop(L, 2);
+        return false;
+    }
+    strlcpy(dst, lua_tostring(L, -1), dst_size);
+    lua_pop(L, 2);
+    return dst[0] != '\0';
+}
+
 static bool lua_table_get_integer_field(lua_State *L,
                                         int index,
                                         const char *field_name,
@@ -278,15 +302,50 @@ static int lua_event_publisher_publish_message(lua_State *L)
     const char *text = NULL;
     const char *sender_id = NULL;
     const char *message_id = NULL;
+    char channel_buf[64];
+    char chat_id_buf[96];
     esp_err_t err;
+    int ty = lua_type(L, 1);
 
-    luaL_checktype(L, 1, LUA_TTABLE);
-    source_cap = lua_table_get_string_field(L, 1, "source_cap", true);
-    channel = lua_table_get_string_field(L, 1, "channel", true);
-    chat_id = lua_table_get_string_field(L, 1, "chat_id", true);
-    text = lua_table_get_string_field(L, 1, "text", true);
-    sender_id = lua_table_get_string_field(L, 1, "sender_id", false);
-    message_id = lua_table_get_string_field(L, 1, "message_id", false);
+    /*
+     * Table form: publish_message({ source_cap, channel, chat_id, text, ... })
+     * String form: publish_message("hello") — text only; source_cap defaults to lua_script;
+     * channel/chat_id filled from global `args` when the agent injected session context.
+     */
+    if (ty == LUA_TSTRING) {
+        text = lua_tostring(L, 1);
+        source_cap = "lua_script";
+        channel = NULL;
+        chat_id = NULL;
+        sender_id = NULL;
+        message_id = NULL;
+    } else if (ty == LUA_TTABLE) {
+        source_cap = lua_table_get_string_field(L, 1, "source_cap", true);
+        channel = lua_table_get_string_field(L, 1, "channel", false);
+        chat_id = lua_table_get_string_field(L, 1, "chat_id", false);
+        text = lua_table_get_string_field(L, 1, "text", true);
+        sender_id = lua_table_get_string_field(L, 1, "sender_id", false);
+        message_id = lua_table_get_string_field(L, 1, "message_id", false);
+    } else {
+        luaL_argerror(L, 1, "table or message string expected");
+    }
+
+    if (!channel || !channel[0]) {
+        if (lua_global_args_copy_string(L, "channel", channel_buf, sizeof(channel_buf))) {
+            channel = channel_buf;
+        }
+    }
+    if (!chat_id || !chat_id[0]) {
+        if (lua_global_args_copy_string(L, "chat_id", chat_id_buf, sizeof(chat_id_buf))) {
+            chat_id = chat_id_buf;
+        }
+    }
+    if (!channel || !channel[0]) {
+        return luaL_error(L, "missing channel (table field or global args.channel)");
+    }
+    if (!chat_id || !chat_id[0]) {
+        return luaL_error(L, "missing chat_id (table field or global args.chat_id)");
+    }
 
     err = claw_event_router_publish_message(source_cap,
                                             channel,

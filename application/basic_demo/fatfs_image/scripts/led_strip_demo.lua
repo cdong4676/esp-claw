@@ -1,22 +1,36 @@
+-- WS2812 demo: flash + rainbow. Optional args: pin, num, flash_ms, rainbow_step_ms (integers).
+-- Pattern: xpcall(run) + cleanup() (strip:clear/close); no bare gpio constants without args fallback.
 local ls    = require("led_strip")
 local delay = require("delay")
 
--- Update these values to match the LED strip wiring on the target board.
-local LED_GPIO_NUM = 38
-local LED_COUNT = 16
-
--- Create the strip handle and drive all pixels together.
-print("[led] creating led strip on gpio " .. tostring(LED_GPIO_NUM))
-local strip, serr = ls.new(LED_GPIO_NUM, LED_COUNT)
-if not strip then
-    print("[led] ERROR: failed to create led strip: " .. tostring(serr))
-    return
+local a = type(args) == "table" and args or {}
+local function int_arg(k, default)
+    local v = a[k]
+    if type(v) == "number" then
+        return math.floor(v)
+    end
+    return default
 end
-print("[led] led strip created")
 
--- Clear first so the demo always starts from a known LED state.
-strip:clear()
-print("[led] strip cleared")
+local LED_GPIO_NUM   = int_arg("pin", 38)
+local LED_COUNT      = int_arg("num", 16)
+local FLASH_MS       = int_arg("flash_ms", 150)
+local RAINBOW_STEP_MS = int_arg("rainbow_step_ms", 40)
+
+local strip
+
+local function cleanup()
+    if strip then
+        pcall(function()
+            strip:clear()
+            strip:refresh()
+        end)
+        pcall(function()
+            strip:close()
+        end)
+        strip = nil
+    end
+end
 
 local function fill_all_rgb(r, g, b)
     for index = 0, LED_COUNT - 1 do
@@ -31,26 +45,41 @@ local function draw_rainbow(offset)
     end
 end
 
-print("[led] flash start")
-for i = 1, 3 do
-    fill_all_rgb(255, 255, 255)
-    strip:refresh()
-    delay.delay_ms(150)
+local function run()
+    print("[led] creating led strip on gpio " .. tostring(LED_GPIO_NUM) .. " count=" .. tostring(LED_COUNT))
+    strip = ls.new(LED_GPIO_NUM, LED_COUNT)
+    print("[led] led strip created")
 
     strip:clear()
-    strip:refresh()
-    delay.delay_ms(150)
-end
-print("[led] flash end")
+    print("[led] strip cleared")
 
-print("[led] rainbow animation start")
-for offset = 0, 720, 8 do
-    draw_rainbow(offset)
+    print("[led] flash start")
+    for i = 1, 3 do
+        fill_all_rgb(255, 255, 255)
+        strip:refresh()
+        delay.delay_ms(FLASH_MS)
+
+        strip:clear()
+        strip:refresh()
+        delay.delay_ms(FLASH_MS)
+    end
+    print("[led] flash end")
+
+    print("[led] rainbow animation start")
+    for offset = 0, 720, 8 do
+        draw_rainbow(offset)
+        strip:refresh()
+        delay.delay_ms(RAINBOW_STEP_MS)
+    end
+
+    print("[led] rainbow animation end")
+    strip:clear()
     strip:refresh()
-    delay.delay_ms(40)
+    print("[led] done")
 end
 
-print("[led] rainbow animation end")
-strip:clear()
-strip:refresh()
-print("[led] done")
+local ok, err = xpcall(run, debug.traceback)
+cleanup()
+if not ok then
+    error(err)
+end
