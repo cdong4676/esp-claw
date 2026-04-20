@@ -140,9 +140,9 @@ menu "Default LLM Settings"
 
     config BASIC_DEMO_LLM_BASE_URL
         string "Default LLM base URL"
-        default "https://api.openai.com" if BASIC_DEMO_LLM_PROVIDER_OPENAI
-        default "https://dashscope.aliyuncs.com" if BASIC_DEMO_LLM_PROVIDER_QWEN
-        default "https://api.anthropic.com" if BASIC_DEMO_LLM_PROVIDER_ANTHROPIC
+        default "https://api.openai.com/v1" if BASIC_DEMO_LLM_PROVIDER_OPENAI
+        default "https://dashscope.aliyuncs.com/compatible-mode/v1" if BASIC_DEMO_LLM_PROVIDER_QWEN
+        default "https://api.anthropic.com/v1" if BASIC_DEMO_LLM_PROVIDER_ANTHROPIC
         default "" if BASIC_DEMO_LLM_PROVIDER_CUSTOM
         help
             Default base URL for the selected provider preset.

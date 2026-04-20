@@ -43,7 +43,7 @@ const strings = {
     llmProfile: "Profile",
     llmProfilePlaceholder: "openai / qwen_compatible / anthropic",
     llmBaseUrl: "Base URL",
-    llmBaseUrlPlaceholder: "https://api.openai.com",
+    llmBaseUrlPlaceholder: "https://api.openai.com/v1",
     llmAuthType: "Auth Type",
     llmAuthTypePlaceholder: "bearer / api-key / none",
 
@@ -174,7 +174,7 @@ const strings = {
     llmProfile: "配置文件",
     llmProfilePlaceholder: "openai / qwen_compatible / anthropic",
     llmBaseUrl: "Base URL",
-    llmBaseUrlPlaceholder: "https://api.openai.com",
+    llmBaseUrlPlaceholder: "https://api.openai.com/v1",
     llmAuthType: "认证类型",
     llmAuthTypePlaceholder: "bearer / api-key / none",
 
@@ -412,19 +412,19 @@ const llmProviderPresets = {
   openai: {
     llm_backend_type: "openai_compatible",
     llm_profile: "openai",
-    llm_base_url: "https://api.openai.com",
+    llm_base_url: "https://api.openai.com/v1",
     llm_auth_type: "bearer",
   },
   qwen: {
     llm_backend_type: "openai_compatible",
     llm_profile: "qwen_compatible",
-    llm_base_url: "https://dashscope.aliyuncs.com",
+    llm_base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
     llm_auth_type: "bearer",
   },
   anthropic: {
     llm_backend_type: "anthropic",
     llm_profile: "anthropic",
-    llm_base_url: "https://api.anthropic.com",
+    llm_base_url: "https://api.anthropic.com/v1",
     llm_auth_type: "none",
   },
 };

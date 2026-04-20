@@ -26,8 +26,8 @@ static const claw_llm_model_profile_t s_profiles[] = {
     {
         .id = "openai",
         .default_backend_type = "openai_compatible",
-        .default_base_url = "https://api.openai.com",
-        .chat_path = "/v1/chat/completions",
+        .default_base_url = "https://api.openai.com/v1",
+        .chat_path = "/chat/completions",
         .max_tokens_field = "max_completion_tokens",
         .default_timeout_ms = CLAW_LLM_DEFAULT_TIMEOUT_MS,
         .default_image_max_bytes = CLAW_LLM_DEFAULT_IMAGE_MAX_BYTES,
@@ -38,8 +38,8 @@ static const claw_llm_model_profile_t s_profiles[] = {
     {
         .id = "qwen_compatible",
         .default_backend_type = "openai_compatible",
-        .default_base_url = "https://dashscope.aliyuncs.com",
-        .chat_path = "/compatible-mode/v1/chat/completions",
+        .default_base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        .chat_path = "/chat/completions",
         .max_tokens_field = "max_tokens",
         .default_timeout_ms = CLAW_LLM_DEFAULT_TIMEOUT_MS,
         .default_image_max_bytes = CLAW_LLM_DEFAULT_IMAGE_MAX_BYTES,
@@ -50,8 +50,8 @@ static const claw_llm_model_profile_t s_profiles[] = {
     {
         .id = "custom_openai_compatible",
         .default_backend_type = "openai_compatible",
-        .default_base_url = "https://api.openai.com",
-        .chat_path = "/v1/chat/completions",
+        .default_base_url = "https://api.openai.com/v1",
+        .chat_path = "/chat/completions",
         .max_tokens_field = "max_completion_tokens",
         .default_timeout_ms = CLAW_LLM_DEFAULT_TIMEOUT_MS,
         .default_image_max_bytes = CLAW_LLM_DEFAULT_IMAGE_MAX_BYTES,
@@ -62,8 +62,8 @@ static const claw_llm_model_profile_t s_profiles[] = {
     {
         .id = "anthropic",
         .default_backend_type = "anthropic",
-        .default_base_url = "https://api.anthropic.com",
-        .chat_path = "/v1/messages",
+        .default_base_url = "https://api.anthropic.com/v1",
+        .chat_path = "/messages",
         .max_tokens_field = "max_tokens",
         .default_timeout_ms = CLAW_LLM_DEFAULT_TIMEOUT_MS,
         .default_image_max_bytes = CLAW_LLM_DEFAULT_IMAGE_MAX_BYTES,
