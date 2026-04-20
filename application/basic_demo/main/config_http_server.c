@@ -18,6 +18,7 @@
 #include "cap_im_wechat.h"
 #include "cJSON.h"
 #include "esp_check.h"
+#include "esp_heap_caps.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
 
@@ -40,10 +41,17 @@ extern const uint8_t lean_qr_min_mjs_end[] asm("_binary_lean_qr_min_mjs_end");
 typedef struct {
     httpd_handle_t server;
     char storage_base_path[CONFIG_HTTP_PATH_MAX];
-    char scratch[CONFIG_HTTP_SCRATCH_SIZE];
 } config_http_server_ctx_t;
 
 static config_http_server_ctx_t s_ctx = {0};
+
+static char *alloc_scratch_buffer(void)
+{
+    return heap_caps_malloc_prefer(CONFIG_HTTP_SCRATCH_SIZE,
+                                   2,
+                                   MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT,
+                                   MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
 
 static bool path_is_safe(const char *path)
 {
@@ -643,16 +651,25 @@ static esp_err_t file_download_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
+    char *scratch = alloc_scratch_buffer();
+    if (!scratch) {
+        fclose(file);
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
     httpd_resp_set_type(req, "application/octet-stream");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
     while (!feof(file)) {
-        size_t read_bytes = fread(s_ctx.scratch, 1, sizeof(s_ctx.scratch), file);
-        if (read_bytes > 0 && httpd_resp_send_chunk(req, s_ctx.scratch, read_bytes) != ESP_OK) {
+        size_t read_bytes = fread(scratch, 1, CONFIG_HTTP_SCRATCH_SIZE, file);
+        if (read_bytes > 0 && httpd_resp_send_chunk(req, scratch, read_bytes) != ESP_OK) {
+            free(scratch);
             fclose(file);
             return ESP_FAIL;
         }
     }
 
+    free(scratch);
     fclose(file);
     return httpd_resp_send_chunk(req, NULL, 0);
 }
@@ -697,18 +714,28 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
         return ESP_FAIL;
     }
 
+    char *scratch = alloc_scratch_buffer();
+    if (!scratch) {
+        fclose(file);
+        unlink(full_path);
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
     int remaining = req->content_len;
     while (remaining > 0) {
-        int chunk = remaining > (int)sizeof(s_ctx.scratch) ? (int)sizeof(s_ctx.scratch) : remaining;
-        int received = httpd_req_recv(req, s_ctx.scratch, chunk);
+        int chunk = remaining > CONFIG_HTTP_SCRATCH_SIZE ? CONFIG_HTTP_SCRATCH_SIZE : remaining;
+        int received = httpd_req_recv(req, scratch, chunk);
         if (received <= 0) {
+            free(scratch);
             fclose(file);
             unlink(full_path);
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Upload failed");
             return ESP_FAIL;
         }
 
-        if (fwrite(s_ctx.scratch, 1, received, file) != (size_t)received) {
+        if (fwrite(scratch, 1, received, file) != (size_t)received) {
+            free(scratch);
             fclose(file);
             unlink(full_path);
             httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Write failed");
@@ -718,6 +745,7 @@ static esp_err_t files_upload_handler(httpd_req_t *req)
         remaining -= received;
     }
 
+    free(scratch);
     fclose(file);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store, max-age=0");
