@@ -320,6 +320,7 @@ void claw_llm_response_free(claw_llm_response_t *response)
     }
 
     free(response->text);
+    free(response->reasoning_content);
     for (i = 0; i < response->tool_call_count; i++) {
         free(response->tool_calls[i].id);
         free(response->tool_calls[i].name);

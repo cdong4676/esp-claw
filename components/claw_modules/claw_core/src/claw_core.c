@@ -868,6 +868,11 @@ static esp_err_t append_assistant_tool_calls(cJSON *messages,
     } else {
         cJSON_AddNullToObject(assistant, "content");
     }
+    if (response->reasoning_content) {
+        cJSON_AddStringToObject(assistant, "reasoning_content", response->reasoning_content);
+    } else {
+        cJSON_AddStringToObject(assistant, "reasoning_content", "");
+    }
 
     tool_calls = cJSON_CreateArray();
     if (!tool_calls) {

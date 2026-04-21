@@ -88,6 +88,7 @@ static esp_err_t parse_chat_response(const char *body,
     cJSON *choice0;
     cJSON *message;
     cJSON *content;
+    cJSON *reasoning_content;
     cJSON *tool_calls;
     cJSON *tool_call;
     size_t tool_count = 0;
@@ -119,6 +120,17 @@ static esp_err_t parse_chat_response(const char *body,
         if (!out_response->text) {
             cJSON_Delete(root);
             *out_error_message = dup_printf("Out of memory copying LLM response");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    reasoning_content = cJSON_GetObjectItem(message, "reasoning_content");
+    if (reasoning_content && cJSON_IsString(reasoning_content)) {
+        out_response->reasoning_content = strdup(reasoning_content->valuestring ?
+                                                 reasoning_content->valuestring : "");
+        if (!out_response->reasoning_content) {
+            cJSON_Delete(root);
+            *out_error_message = dup_printf("Out of memory copying LLM reasoning");
             return ESP_ERR_NO_MEM;
         }
     }
