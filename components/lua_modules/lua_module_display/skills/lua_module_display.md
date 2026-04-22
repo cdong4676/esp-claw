@@ -48,6 +48,7 @@ pcall(display.deinit)
 - Image file paths must be absolute paths under the current storage root, for example `storage.join_path(storage.get_root_dir(), "pic.jpg")`.
 - Paths containing `..` are rejected.
 - Supported image file extensions are `.jpg`, `.jpeg`, and `.png`.
+- This is critical: screen display duration must be considered. Do not deinitialize or exit immediately after `present()`, or the image may only flash briefly. Keep the display session alive long enough, and handle that hold time asynchronously when appropriate.
 
 ## Screen lifecycle
 
