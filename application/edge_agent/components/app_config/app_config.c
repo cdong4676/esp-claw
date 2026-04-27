@@ -64,9 +64,9 @@ static const app_config_field_t s_fields[] = {
     APP_CONFIG_FIELD(wechat_account_id, "wechat_acct_id", APP_DEFAULT_WECHAT_ACCOUNT_ID),
     APP_CONFIG_FIELD(search_brave_key, "brave_key", APP_DEFAULT_SEARCH_BRAVE_KEY),
     APP_CONFIG_FIELD(search_tavily_key, "tavily_key", APP_DEFAULT_SEARCH_TAVILY_KEY),
-    APP_CONFIG_FIELD(enabled_cap_groups, "enabled_cap_groups", APP_DEFAULT_ENABLED_CAP_GROUPS),
-    APP_CONFIG_FIELD(llm_visible_cap_groups, "llm_visible_cap_groups", APP_DEFAULT_LLM_VISIBLE_CAP_GROUPS),
-    APP_CONFIG_FIELD(enabled_lua_modules, "enabled_lua_modules", APP_DEFAULT_ENABLED_LUA_MODULES),
+    APP_CONFIG_FIELD(enabled_cap_groups, "en_cap_groups", APP_DEFAULT_ENABLED_CAP_GROUPS),
+    APP_CONFIG_FIELD(llm_visible_cap_groups, "vis_cap_groups", APP_DEFAULT_LLM_VISIBLE_CAP_GROUPS),
+    APP_CONFIG_FIELD(enabled_lua_modules, "en_lua_mods", APP_DEFAULT_ENABLED_LUA_MODULES),
     APP_CONFIG_FIELD(time_timezone, "time_timezone", APP_DEFAULT_TIME_TIMEZONE),
 };
 

@@ -101,6 +101,7 @@ dependencies:
 
   emote:
     rules:
+      - if: $CONFIG{ESP_BOARD_DEV_DISPLAY_LCD_SUPPORT} == True
       - if: $CONFIG{APP_CLAW_ENABLE_EMOTE} == True
     path: ../emote
 
