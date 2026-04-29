@@ -1,12 +1,20 @@
 # ChangeLog
 
-## Unreleased
+## 2026-04-29
 
 ### Feature:
 
 * Refactored the Web Config interface:
   * Introduced support for fine-grained configuration controls 
   * Added a basic online chat module.
+
+* Added support for the following third-party development boards:
+  * `m5stack_cores3` (PR #5, contributed by @imliubo)
+  * `m5stack_sticks3` (PR #6, contributed by @imliubo)
+  * `dfrobot_k10` (PR #28, contributed by @wxzed)
+  * `lilygo_t_display_s3` (PR #14, contributed by @terry-cook)
+
+* Enhanced CI board builds to support optional brand-specific board paths, emit `board_brand` in merged binary metadata, and append ESP32-P4 revision suffixes to generated merged binary artifacts while recording `rev` in the output JSON.
 
 * Added the `edge_agent` demo application with Wi-Fi setup, HTTP management UI, FATFS image content, Lua script examples, skill assets, router rules, scheduler rules, and partition defaults.
 
@@ -28,9 +36,13 @@
 
 * Migrated selected Basic Demo updates into Edge Agent, including app configuration handling, HTTP UI updates, Lua module wiring, and default SDK configuration changes.
 
+* Moved `dfrobot_k10` and other shipped board definitions into vendor-specific subdirectories, and relocated the LilyGO T-Display-S3 board assets from `basic_demo` to `edge_agent`.
+
 ### Fix:
 
 * Cleared context outputs before collection across Lua jobs, tool catalogs, memory providers, and skill prompts so failed collection paths do not leak stale content.
+
+* Fixed LilyGO T-Display-S3 LCD startup behavior.
 
 ## 2026-04-21
 
