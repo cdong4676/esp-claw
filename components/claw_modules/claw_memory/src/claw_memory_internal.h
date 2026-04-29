@@ -15,7 +15,7 @@
 #include "llm/claw_llm_runtime.h"
 
 #define CLAW_MEMORY_DEFAULT_MAX_SESSION_MESSAGES 20
-#define CLAW_MEMORY_DEFAULT_MAX_MESSAGE_CHARS    256
+#define CLAW_MEMORY_DEFAULT_MAX_MESSAGE_CHARS    4096
 #define CLAW_MEMORY_MAX_PATH                     192
 #define CLAW_MEMORY_MAX_SUMMARIES                3
 #define CLAW_MEMORY_MAX_LABEL_CHARS              8
