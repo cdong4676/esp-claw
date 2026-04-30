@@ -161,9 +161,18 @@ static esp_err_t emit_config(httpd_req_t *req,
 static esp_err_t config_get_handler(httpd_req_t *req)
 {
     http_server_ctx_t *ctx = http_server_ctx();
-    app_config_t config;
-    esp_err_t err = ctx->services.load_config(&config);
+    app_config_t *config = NULL;
+    esp_err_t err;
+
+    config = calloc(1, sizeof(*config));
+    if (!config) {
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    err = ctx->services.load_config(config);
     if (err != ESP_OK) {
+        free(config);
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to load config");
     }
 
@@ -223,7 +232,8 @@ static esp_err_t config_get_handler(httpd_req_t *req)
         }
     }
 
-    esp_err_t send_err = emit_config(req, &config, groups_csv, fields_csv, meta);
+    esp_err_t send_err = emit_config(req, config, groups_csv, fields_csv, meta);
+    free(config);
     free(groups_csv);
     free(fields_csv);
     return send_err;
@@ -232,15 +242,25 @@ static esp_err_t config_get_handler(httpd_req_t *req)
 static esp_err_t config_post_handler(httpd_req_t *req)
 {
     http_server_ctx_t *ctx = http_server_ctx();
-    app_config_t config;
-    esp_err_t err = ctx->services.load_config(&config);
+    app_config_t *config = NULL;
+    esp_err_t err;
+
+    config = calloc(1, sizeof(*config));
+    if (!config) {
+        httpd_resp_send_500(req);
+        return ESP_ERR_NO_MEM;
+    }
+
+    err = ctx->services.load_config(config);
     if (err != ESP_OK) {
+        free(config);
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to load config");
     }
 
     cJSON *root = NULL;
     err = http_server_parse_json_body(req, &root);
     if (err != ESP_OK) {
+        free(config);
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON body");
     }
 
@@ -254,18 +274,20 @@ static esp_err_t config_post_handler(httpd_req_t *req)
         if (!cJSON_IsString(item)) {
             continue;
         }
-        strlcpy(field_mutable(&config, field), item->valuestring, field->size);
+        strlcpy(field_mutable(config, field), item->valuestring, field->size);
         applied_count++;
     }
 
     cJSON_Delete(root);
 
     if (applied_count == 0) {
+        free(config);
         return httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
                                    "Request did not contain any recognised fields");
     }
 
-    err = ctx->services.save_config(&config);
+    err = ctx->services.save_config(config);
+    free(config);
     if (err != ESP_OK) {
         return httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save config");
     }

@@ -144,29 +144,38 @@ static esp_err_t main_wechat_login_start(const char *account_id, bool force)
 
 static esp_err_t main_wechat_login_get_status(http_server_wechat_login_status_t *status)
 {
+    cap_im_wechat_qr_login_status_t *raw = NULL;
+    esp_err_t err;
+
     if (!status) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    cap_im_wechat_qr_login_status_t raw = {0};
-    esp_err_t err = cap_im_wechat_qr_login_get_status(&raw);
+    raw = calloc(1, sizeof(*raw));
+    if (!raw) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    err = cap_im_wechat_qr_login_get_status(raw);
     if (err != ESP_OK) {
+        free(raw);
         return err;
     }
 
     memset(status, 0, sizeof(*status));
-    status->active = raw.active;
-    status->configured = raw.configured;
-    status->completed = raw.completed;
-    status->persisted = raw.persisted;
-    strlcpy(status->session_key, raw.session_key, sizeof(status->session_key));
-    strlcpy(status->status, raw.status, sizeof(status->status));
-    strlcpy(status->message, raw.message, sizeof(status->message));
-    strlcpy(status->qr_data_url, raw.qr_data_url, sizeof(status->qr_data_url));
-    strlcpy(status->account_id, raw.account_id, sizeof(status->account_id));
-    strlcpy(status->user_id, raw.user_id, sizeof(status->user_id));
-    strlcpy(status->token, raw.token, sizeof(status->token));
-    strlcpy(status->base_url, raw.base_url, sizeof(status->base_url));
+    status->active = raw->active;
+    status->configured = raw->configured;
+    status->completed = raw->completed;
+    status->persisted = raw->persisted;
+    strlcpy(status->session_key, raw->session_key, sizeof(status->session_key));
+    strlcpy(status->status, raw->status, sizeof(status->status));
+    strlcpy(status->message, raw->message, sizeof(status->message));
+    strlcpy(status->qr_data_url, raw->qr_data_url, sizeof(status->qr_data_url));
+    strlcpy(status->account_id, raw->account_id, sizeof(status->account_id));
+    strlcpy(status->user_id, raw->user_id, sizeof(status->user_id));
+    strlcpy(status->token, raw->token, sizeof(status->token));
+    strlcpy(status->base_url, raw->base_url, sizeof(status->base_url));
+    free(raw);
     return ESP_OK;
 }
 
