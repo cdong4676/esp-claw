@@ -325,7 +325,7 @@ esp_err_t app_claw_start(const basic_demo_settings_t *settings)
     claw_core_config_t core_config = {0};
     claw_event_router_config_t router_config = {
         .rules_path = NULL,
-        .task_stack_size = 8 * 1024,
+        .task_stack_size = 10 * 1024,
         .task_priority = 5,
         .task_core = tskNO_AFFINITY,
         .core_submit_timeout_ms = 1000,

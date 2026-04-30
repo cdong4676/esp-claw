@@ -1,16 +1,4 @@
 devices:
-  - name: audio_adc          # The name of the device, must be unique
-    type: custom              # Use custom type to avoid I2C dependency
-    version: 1.0.0
-    config:
-      sample_rate_hz: 16000           # Sample rate in Hz
-
-  - name: audio_dac          # The name of the device, must be unique
-    type: custom              # Use custom type to avoid I2C dependency
-    version: 1.0.0
-    config:
-      sample_rate_hz: 24000           # Sample rate in Hz
-
   - name: camera         # The name of the device, must be unique
     type: camera         # The type of the camera, must be equal to "camera"
     version: default
