@@ -7,9 +7,10 @@ peripherals:
     config:
       port: 0
       pins:
-        sda: 4
-        scl: 5
-      frequency: 400000
+        sda: 7
+        scl: 15
+      frequency: 100000
+      enable_internal_pullup: true  # 启用内部上拉电阻，SSD1306 需要
 
   - name: spi_display
     type: spi
