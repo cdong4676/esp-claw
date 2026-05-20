@@ -1,10 +1,143 @@
 # ChangeLog
 
+## 2026-05-19
+
+### Feature:
+
+* Added Markdown preview support in Web Chat. (Related to https://github.com/espressif/esp-claw/issues/36)
+
+### Fixes:
+
+* Web Chat:
+  * Append messages immediately instead of waiting for send success. (Related to https://github.com/espressif/esp-claw/issues/36)
+  * Use visual indicators for send status and allow retries.
+  * Preserve Web Chat history when switching between tabs.
+* Board: Adjusted partition table size to accommodate larger bootloaders on some development boards.
+
+## 2026-05-18
+
+### Feature:
+
+* Added typed raw session history persistence for Claw Core and Claw Memory, preserving the full Agent turn flow: user input, raw assistant tool-call messages, tool results, final assistant messages, and failure notes.
+* Preserved raw assistant messages from OpenAI-compatible and Anthropic-compatible backends so tool-call history can be replayed without reconstructing backend-specific message shapes.
+* Added indexed append-only session history storage using JSON data records and paired `.idx` entries with offset, length, record type, and backend format.
+* Added size-based session compaction and oversized-session blocking. Compaction keeps user and final assistant records, recent tool-turn records, and unfinished current-turn records; blocked sessions return `/new` guidance instead of growing history further.
+* Added a Claw Core request gate callback and request-start-only context provider flag for blocked-session rejection and once-per-request history collection.
+* Degraded final assistant records to plain text across incompatible backend formats, while skipping unsafe backend-specific tool records.
+
+### Change:
+
+* Replaced `append_session_turn` with the `persist_session` typed record batch callback. Applications should migrate to `claw_memory_persist_session_callback` or provide an equivalent `claw_core_persist_session_fn`.
+* Removed `max_session_messages` from `claw_memory_config_t`; session retention now uses size limits and compaction.
+* Removed the Claw Memory `mbedtls` private dependency previously used for encoded session headers.
+
+### Fix:
+
+* Preserved Anthropic `redacted_thinking` blocks and propagated tool-result error state when converting tool messages for Anthropic-compatible requests.
+
+## 2026-05-11
+
+### Feature:
+
+* Added Lua access to the SCI sensor for DFRobot-K10. (@rockets-cn, https://github.com/espressif/esp-claw/pull/32)
+* Added configurable AP name and password settings for Wi-Fi. (@Karasukaigan, https://github.com/espressif/esp-claw/pull/63) (Related to https://github.com/espressif/esp-claw/issues/41)
+* Used a more stable system prompt to improve cache hit rates. (ae_group/esp-claw!133)
+
+### Board:
+
+* Added movecall_cuican_esp32s3, movecall_moji_esp32s3, movecall_moji2_esp32c5. (@MoveCall, https://github.com/espressif/esp-claw/pull/50)
+* Added Waveshare ESP32-P4 NANO. (@yuzheyi, https://github.com/espressif/esp-claw/pull/59)
+* Added NologoTech Xingzhi-395. (@vaemc, https://github.com/espressif/esp-claw/pull/55)
+
+### Fix:
+
+* Improved patch version compatibility across different IDF versions. (ae_group/esp-claw!134)
+* Fixed UTF-8 sanitization in the LLM request body to prevent HTTP 400 errors. (@yuzheyi, https://github.com/espressif/esp-claw/pull/58)
+* Preserved thinking blocks and merged consecutive tool results to fix an Anthropic API compliance issue. (@zz6zz666, https://github.com/espressif/esp-claw/pull/40)
+* Fixed missing `Console Output` declarations in some development builds. (ae_group/esp-claw!132)
+
+## 2026-05-09
+
+### Fix:
+
+* LLM HTTP transport (`claw_llm_http_post_json`): copy and sanitize JSON request bodies so invalid UTF-8 sequences are replaced before POST, avoiding stack/client issues on malformed input. (https://github.com/espressif/esp-claw/pull/58, Thanks @yuzheyi.)
+
+### Feature:
+
+* Stablized the system prompt:
+  * `activate_skill` now accepts one `skill_id` per call and returns the full Skill markdown document in a `<skill_content>` tool result.
+  * Removed automatic active Skill document prompt injection and the `deactivate_skill` flow.
+  * Removed time context and part of session context from system prompt to keep it stable.
+  * Removed lua async job infomation from system prompt.
+
+## 2026-05-08
+
+### Refactor:
+
+* **Breaking change**: Removed the LLM Profile concept. You may need to update your LLM configuration accordingly.
+  * A forward compatibility transition has been added for now and will be removed in a future release.
+
+## 2026-05-07
+
+### Tools:
+
+* Online Flashing Tool: Supported flashing firmware with different console outputs
+
+### Feature:
+
+* Added the `take_picture` Lua module skill for camera-enabled boards, including a guarded JPEG capture script with filename/directory validation and saved-frame reporting.
+
+* Added `system.heap` APIs to `lua_module_system` for heap capability constants, heap statistics, task stack high-water marks, and current-task stack inspection.
+
+* Added Lua test scripts for web search and IM send capability calls.
+
+* Added Skill Creator guidance and reference material for authoring Lua-backed Skills, including script creation workflow, file tool usage, and runnable script conventions.
+
+### Fix:
+
+* Added WebSocket heartbeat support to Web Chat for improved reliability. (https://github.com/espressif/esp-claw/issues/36)
+
+* Disabled default Lua and system capability registration in shared app capability wiring so applications only enable them explicitly.
+
+### Change:
+
+* Merged Feishu, QQ, Telegram, WeChat, and IM attachment sources, Skills, and docs into the unified `cap_im_platform` component while keeping existing per-platform runtime group IDs and tool names.
+
+* Removed the standalone `lua_module_esp_heap` module and folded its heap introspection APIs into `lua_module_system` as `system.heap`.
+
+* Updated `cap_lua` script management to rely on file tools (`list_dir`, `read_file`, and `write_file`) for discovering and editing scripts instead of a dedicated Lua script listing tool.
+
+### Refactor:
+
+* Renamed six hardware-peripheral Lua modules from `lua_module_*` to `lua_driver_*` (adc, gpio, i2c, mcpwm, touch, uart) to distinguish low-level drivers from higher-level modules. Updated directory names, source filenames, all internal symbols, Kconfig options (`APP_CLAW_LUA_MODULE_*` → `APP_CLAW_LUA_DRIVER_*`), CMake dependencies, `idf_component.yml` entries, and documentation references.
+
 ## 2026-05-06
+
+### Feature:
+
+* Merged DHT-family single-wire sensor support into `lua_module_environmental_sensor`, allowing the same module to drive both BME690 (I2C) and DHT11/DHT22/AM2301/AM2302/AM2321/SI7021 sensors via separate Kconfig backends.
+
+* Added MPU6050 chip support to `lua_module_imu`, including a standalone MPU6050 driver (`mpu6050.c`), configurable SDO pin level for I2C address selection, and accelerometer/gyroscope read APIs.
+
+* Reorganized `lua_module_magnetometer` BMM350 driver sources into a dedicated `bmm350/` subdirectory for clearer module structure.
+
+* Added a shared `http_reuse` component that wraps `esp_http_client_init`, `esp_http_client_cleanup`, and `esp_http_client_perform` to transparently reuse persistent HTTP clients across requests to the same endpoint.
+
+* Added Kconfig options for HTTP client reuse, including feature enablement and configurable pool sizing.
+
+* Added pooled client LRU eviction and one-time retry-on-failure handling for reused connections to reduce repeated connection setup and improve robustness.
+
+* Wired `http_reuse` into `claw_core`, `cap_mcp_client`, `cap_web_search`, `cap_im_attachment`, `cap_im_feishu`, `cap_im_qq`, `cap_im_tg`, and `cap_im_wechat`.
+
+* Added an indexed session history file header for Claw memory sessions to retain recent records by offset and rebuild session JSON without scanning legacy tab-delimited lines.
 
 ### Fix:
 
 * Improved file descriptor management for WebSocket connections to reduce the issue where Web Chat did not receive reply messages. (https://github.com/espressif/esp-claw/issues/36)
+
+* Adjusted `cap_im_qq` HTTP TX buffer sizing when HTTP reuse is enabled so reused clients keep compatible buffer settings.
+
+* Fixed Feishu inbound image attachment saving to derive file extensions from the downloaded MIME type instead of assuming JPEG. 
 
 ## 2026-05-03
 
@@ -24,7 +157,7 @@
 
 * Added shared `app_claw` integration for the new Lua environmental sensor and magnetometer modules, including Kconfig, component dependencies, and Lua module registration.
 
-* Added the `lua_module_environmental_sensor` module with Lua-facing sensor APIs and a `basic_environmental_sensor.lua` example script.
+* Added the `lua_module_environmental_sensor` module with Lua-facing sensor APIs and an `environmental_read.lua` example script.
 
 * Added the `lua_module_magnetometer` module with bundled `bmm350` driver sources, Lua bindings, example scripts, and skill metadata.
 
@@ -47,6 +180,7 @@
 * Enhanced the Edge Agent web chat experience with local chat session persistence, file upload support, richer status and restart feedback, and updated configuration editing UI.
 
 * Refactored the docs online flashing workflow with a redesigned multi-step flash page, refreshed localized copy, and updated firmware metadata generation for the new tool flow.
+
 
 ### Change:
 
@@ -108,11 +242,19 @@
 
 * Reworked `cap_time` to use SNTP-based synchronization, added on-demand current time retrieval, and injected a time context provider for relative date reasoning in `claw_core`.
 
+* Added standard directory-based skill packaging with JSON frontmatter, generated skill sync tooling, and migrated shipped capability, memory, and Edge Agent skills from flat markdown files to `SKILL.md` directories.
+
+* Added Lua module build and sync tooling for generated builtin Lua module/script skills, including module docs, script source metadata, shared Lua sync helpers, and the `lua_led_strip_switch` skill.
+
+* Updated the ESP32-S3 DevKitC-1 breadboard UAC codec lifecycle to separate open/start/stop/close handling, track stream state, reuse device handles, and close devices on delete or disconnect.
+
 ### Change:
 
 * Migrated selected Basic Demo updates into Edge Agent, including app configuration handling, HTTP UI updates, Lua module wiring, and default SDK configuration changes.
 
 * Moved `dfrobot_k10` and other shipped board definitions into vendor-specific subdirectories, and relocated the LilyGO T-Display-S3 board assets from `basic_demo` to `edge_agent`.
+
+* Reorganized Lua module documentation and examples into `docs/`, `lua_scripts/test`, and `lua_scripts/lib`, replacing per-module `skills_list.json` files with generated skill sources.
 
 ### Fix:
 

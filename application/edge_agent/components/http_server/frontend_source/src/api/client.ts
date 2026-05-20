@@ -1,14 +1,21 @@
 export type AppConfig = {
   wifi_ssid: string;
   wifi_password: string;
+  ap_ssid: string;
+  ap_password: string;
+  ap_behavior: string;
   llm_api_key: string;
   llm_backend_type: string;
-  llm_profile: string;
   llm_model: string;
   llm_base_url: string;
   llm_auth_type: string;
   llm_timeout_ms: string;
   llm_max_tokens: string;
+  llm_default_image_max_bytes: string;
+  llm_max_tokens_field: string;
+  llm_supports_tools: string;
+  llm_supports_vision: string;
+  llm_image_remote_url_only: string;
   qq_app_id: string;
   qq_app_secret: string;
   feishu_app_id: string;
@@ -20,6 +27,7 @@ export type AppConfig = {
   wechat_account_id: string;
   search_brave_key: string;
   search_tavily_key: string;
+  search_http_allowlist: string;
   enabled_cap_groups: string;
   llm_visible_cap_groups: string;
   enabled_lua_modules: string;
@@ -38,16 +46,20 @@ export type ConfigGroup =
   | 'time';
 
 export const GROUP_FIELDS: Record<ConfigGroup, (keyof AppConfig)[]> = {
-  wifi: ['wifi_ssid', 'wifi_password'],
+  wifi: ['wifi_ssid', 'wifi_password', 'ap_ssid', 'ap_password', 'ap_behavior'],
   llm: [
     'llm_api_key',
     'llm_backend_type',
-    'llm_profile',
     'llm_model',
     'llm_base_url',
     'llm_auth_type',
     'llm_timeout_ms',
     'llm_max_tokens',
+    'llm_default_image_max_bytes',
+    'llm_max_tokens_field',
+    'llm_supports_tools',
+    'llm_supports_vision',
+    'llm_image_remote_url_only',
   ],
   im: [
     'qq_app_id',
@@ -60,7 +72,7 @@ export const GROUP_FIELDS: Record<ConfigGroup, (keyof AppConfig)[]> = {
     'wechat_cdn_base_url',
     'wechat_account_id',
   ],
-  search: ['search_brave_key', 'search_tavily_key'],
+  search: ['search_brave_key', 'search_tavily_key', 'search_http_allowlist'],
   capabilities: ['enabled_cap_groups', 'llm_visible_cap_groups'],
   skills: ['enabled_lua_modules'],
   time: ['time_timezone'],

@@ -38,7 +38,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "../../managed_components/espressif__esp_board_manager/devices/dev_display_lcd/dev_display_lcd.h"
+
 #include "gen_board_device_custom.h"
 
 static const char *TAG = "lilygo_t_display_s3";
@@ -278,7 +278,7 @@ static int display_lcd_init(void *config, int cfg_size, void **device_handle)
 
     s_lcd_handles.io_handle = io_handle;
     s_lcd_handles.panel_handle = panel_handle;
-    esp_board_device_update_config("display_lcd", (void *)&s_lcd_config);
+    esp_board_device_override_config("display_lcd", (void *)&s_lcd_config, sizeof(s_lcd_config));
     *device_handle = &s_lcd_handles;
 
     ESP_LOGI(TAG, "T-Display-S3 i80 LCD ready (%dx%d @ %d Hz)",

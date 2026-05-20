@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 #include "app_claw.h"
+#include "claw_ramfs.h"
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -26,8 +27,12 @@
 #endif
 #include "app_config.h"
 
-#define APP_FATFS_PARTITION_LABEL "storage"
 #define APP_ENABLE_MEM_LOG        (0)
+
+#define APP_FATFS_PARTITION_LABEL "storage"
+#define APP_RAMFS_BASE_PATH       "/ramfs"
+#define APP_RAMFS_MAX_FILES       (8)
+#define APP_RAMFS_MAX_BYTES       (512 * 1024)
 
 static const char *TAG = "app";
 
@@ -119,6 +124,15 @@ static esp_err_t main_load_config(app_config_t *config)
 
 static esp_err_t main_save_config(const app_config_t *config)
 {
+    if (!config) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t err = app_config_validate_wifi(config, NULL);
+    if (err != ESP_OK) {
+        return err;
+    }
+
     return app_config_save(config);
 }
 
@@ -250,6 +264,29 @@ static esp_err_t init_fatfs(void)
     return ESP_OK;
 }
 
+static esp_err_t init_ramfs(void)
+{
+    claw_ramfs_config_t config = {
+        .base_path = APP_RAMFS_BASE_PATH,
+        .max_files = APP_RAMFS_MAX_FILES,
+        .max_bytes = APP_RAMFS_MAX_BYTES,
+        .caps = MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT,
+    };
+    esp_err_t err = claw_ramfs_register(&config);
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to mount RAMFS at %s: %s", APP_RAMFS_BASE_PATH, esp_err_to_name(err));
+        return err;
+    }
+
+    ESP_LOGI(TAG, "RAMFS mounted at %s max_files=%u max_bytes=%u",
+             APP_RAMFS_BASE_PATH,
+             (unsigned int)APP_RAMFS_MAX_FILES,
+             (unsigned int)APP_RAMFS_MAX_BYTES);
+
+    return ESP_OK;
+}
+
 static esp_err_t init_timezone(const char *timezone)
 {
     esp_err_t err = ESP_OK;
@@ -315,6 +352,7 @@ static void memory_monitor_task(void *arg)
 void app_main(void)
 {
     esp_log_level_set("esp-x509-crt-bundle", ESP_LOG_WARN);
+    esp_log_level_set("http_reuse", ESP_LOG_WARN);
 
     ESP_LOGI(TAG, "Starting app");
     ESP_ERROR_CHECK(app_allocate_runtime_state());
@@ -326,6 +364,7 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_board_manager_init());
     ESP_ERROR_CHECK(app_claw_ui_start());
     ESP_ERROR_CHECK(init_fatfs());
+    ESP_ERROR_CHECK(init_ramfs());
     ESP_ERROR_CHECK(wifi_manager_init());
     ESP_ERROR_CHECK(http_server_init(&(http_server_config_t) {
         .storage_base_path = app_fatfs_base_path,
@@ -347,6 +386,9 @@ void app_main(void)
     esp_err_t wifi_err = wifi_manager_start(&(wifi_manager_config_t) {
         .sta_ssid = s_config->wifi_ssid,
         .sta_password = s_config->wifi_password,
+        .ap_ssid = s_config->ap_ssid[0] ? s_config->ap_ssid : NULL,
+        .ap_password = s_config->ap_password[0] ? s_config->ap_password : NULL,
+        .ap_behavior = s_config->ap_behavior,
     });
     if (wifi_err != ESP_OK) {
         ESP_LOGE(TAG, "Wi-Fi start failed: %s", esp_err_to_name(wifi_err));
@@ -371,11 +413,15 @@ void app_main(void)
 
         wifi_manager_status_t status = {0};
         wifi_manager_get_status(&status);
-        ESP_LOGW(TAG,
-                 "*** Provisioning portal: SSID=\"%s\" (open) IP=%s URL=http://%s/ ***",
-                 status.ap_ssid,
-                 status.ap_ip,
-                 status.ap_ip);
+        if (status.ap_active) {
+            const char *portal_auth = s_config->ap_password[0] ? "wpa2" : "open";
+            ESP_LOGW(TAG,
+                     "*** Provisioning portal: SSID=\"%s\" (auth=%s) IP=%s URL=http://%s/ ***",
+                     status.ap_ssid,
+                     portal_auth,
+                     status.ap_ip,
+                     status.ap_ip);
+        }
     }
 
     ESP_ERROR_CHECK(app_claw_init_storage_paths(s_claw_paths));

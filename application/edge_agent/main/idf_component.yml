@@ -1,7 +1,7 @@
 ## IDF Component Manager Manifest File
 dependencies:
   espressif/esp_board_manager:
-    version: "^0.5.7"
+    version: "^0.5.10"
     public: true
   espressif/esp_wifi_remote:
     version: ">=0.10,<2.0"
@@ -24,18 +24,19 @@ dependencies:
   app_config:
     path: ../components/app_config
 
-  cap_im_wechat:
-    path: ../../../components/claw_capabilities/cap_im_wechat
-    rules:
-      - if: $CONFIG{APP_CLAW_CAP_IM_WECHAT} == True
-
   captive_dns:
     path: ../../../components/common/captive_dns
+
+  claw_ramfs:
+    path: ../../../components/claw_modules/claw_ramfs
 
   emote:
     path: ../../../components/common/emote
     rules:
       - if: $CONFIG{ESP_BOARD_DEV_DISPLAY_LCD_SUPPORT} == True
+
+  http_reuse:
+    path: ../../../components/common/http_reuse
 
   http_server:
     path: ../components/http_server

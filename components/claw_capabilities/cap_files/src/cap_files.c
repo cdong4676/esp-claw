@@ -23,7 +23,49 @@ static const char *TAG = "cap_files";
 
 #define CAP_FILES_MAX_FILE_SIZE (32 * 1024)
 
+#define CAP_FILES_TRUNCATION_SUFFIX_RESERVE 96
+
 static char s_files_base_dir[128] = {0};
+
+static bool cap_files_text_contains_ci(const char *haystack, const char *needle)
+{
+    size_t needle_len;
+
+    if (!needle || !needle[0]) {
+        return true;
+    }
+    if (!haystack) {
+        return false;
+    }
+
+    needle_len = strlen(needle);
+    for (const char *cursor = haystack; *cursor; cursor++) {
+        size_t i;
+
+        for (i = 0; i < needle_len; i++) {
+            unsigned char hc = (unsigned char)cursor[i];
+            unsigned char nc = (unsigned char)needle[i];
+
+            if (hc == '\0') {
+                return false;
+            }
+            if (hc >= 'A' && hc <= 'Z') {
+                hc = (unsigned char)(hc - 'A' + 'a');
+            }
+            if (nc >= 'A' && nc <= 'Z') {
+                nc = (unsigned char)(nc - 'A' + 'a');
+            }
+            if (hc != nc) {
+                break;
+            }
+        }
+        if (i == needle_len) {
+            return true;
+        }
+    }
+
+    return false;
+}
 
 static bool cap_files_path_is_valid(const char *path)
 {
@@ -61,6 +103,7 @@ static esp_err_t cap_files_resolve_path(const char *path, char *resolved, size_t
 
     if (path[0] == '/') {
         if (!cap_files_path_is_valid(path)) {
+            ESP_LOGE(TAG, "path escapes base: %s", path);
             return ESP_ERR_INVALID_ARG;
         }
         strlcpy(resolved, path, resolved_size);
@@ -68,15 +111,18 @@ static esp_err_t cap_files_resolve_path(const char *path, char *resolved, size_t
     }
 
     if (strstr(path, "..") != NULL) {
+        ESP_LOGE(TAG, "path traversal: %s", path);
         return ESP_ERR_INVALID_ARG;
     }
 
     written = snprintf(resolved, resolved_size, "%s/%s", s_files_base_dir, path);
     if (written < 0 || (size_t)written >= resolved_size) {
+        ESP_LOGE(TAG, "path too long: %s", path);
         return ESP_ERR_INVALID_SIZE;
     }
 
     if (!cap_files_path_is_valid(resolved)) {
+        ESP_LOGE(TAG, "path escapes base: %s", resolved);
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -92,7 +138,7 @@ static esp_err_t cap_files_ensure_dir(const char *path)
     }
 
     if (mkdir(path, 0755) != 0 && errno != EEXIST) {
-        ESP_LOGE(TAG, "mkdir failed for %s: errno=%d", path, errno);
+        ESP_LOGE(TAG, "mkdir %s: errno=%d", path, errno);
         return ESP_FAIL;
     }
 
@@ -143,7 +189,7 @@ static esp_err_t cap_files_ensure_parent_dirs(const char *path)
 }
 
 static esp_err_t cap_files_list_recursive(const char *dir_path,
-                                          const char *prefix,
+                                          const char *keyword,
                                           char *output,
                                           size_t output_size,
                                           size_t *offset,
@@ -154,6 +200,7 @@ static esp_err_t cap_files_list_recursive(const char *dir_path,
 
     dir = opendir(dir_path);
     if (!dir) {
+        ESP_LOGE(TAG, "opendir %s: errno=%d", dir_path, errno);
         return ESP_FAIL;
     }
 
@@ -166,6 +213,7 @@ static esp_err_t cap_files_list_recursive(const char *dir_path,
         }
 
         if (snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, entry->d_name) >= (int)sizeof(full_path)) {
+            ESP_LOGE(TAG, "path too long: %s/%s", dir_path, entry->d_name);
             closedir(dir);
             return ESP_ERR_INVALID_SIZE;
         }
@@ -180,7 +228,7 @@ static esp_err_t cap_files_list_recursive(const char *dir_path,
 
         if (S_ISDIR(st.st_mode)) {
             esp_err_t err = cap_files_list_recursive(full_path,
-                                                     prefix,
+                                                     keyword,
                                                      output,
                                                      output_size,
                                                      offset,
@@ -192,7 +240,7 @@ static esp_err_t cap_files_list_recursive(const char *dir_path,
             continue;
         }
 
-        if (prefix && strncmp(full_path, prefix, strlen(prefix)) != 0) {
+        if (keyword && !cap_files_text_contains_ci(full_path, keyword)) {
             continue;
         }
 
@@ -240,11 +288,13 @@ static esp_err_t cap_files_copy_file_internal(const char *src_path, const char *
 
     src = fopen(src_path, "rb");
     if (!src) {
+        ESP_LOGE(TAG, "fopen src %s: errno=%d", src_path, errno);
         return ESP_FAIL;
     }
 
     dst = fopen(dst_path, "wb");
     if (!dst) {
+        ESP_LOGE(TAG, "fopen dst %s: errno=%d", dst_path, errno);
         fclose(src);
         return ESP_FAIL;
     }
@@ -253,10 +303,12 @@ static esp_err_t cap_files_copy_file_internal(const char *src_path, const char *
         size_t read_size = fread(buffer, 1, sizeof(buffer), src);
 
         if (read_size > 0 && fwrite(buffer, 1, read_size, dst) != read_size) {
+            ESP_LOGE(TAG, "fwrite %s: errno=%d", dst_path, errno);
             err = ESP_FAIL;
             break;
         }
         if (ferror(src)) {
+            ESP_LOGE(TAG, "fread %s: errno=%d", src_path, errno);
             err = ESP_FAIL;
             break;
         }
@@ -284,6 +336,8 @@ static esp_err_t cap_files_read_file_execute(const char *input_json,
     FILE *file = NULL;
     size_t max_read;
     size_t read_size;
+    size_t suffix_len;
+    bool will_truncate;
 
     (void)ctx;
 
@@ -300,38 +354,34 @@ static esp_err_t cap_files_read_file_execute(const char *input_json,
         return ESP_ERR_INVALID_ARG;
     }
 
-    max_read = output_size - 1;
-    if (max_read > CAP_FILES_MAX_FILE_SIZE) {
-        max_read = CAP_FILES_MAX_FILE_SIZE;
-    }
-
     if (stat(resolved_path, &st) != 0 || !S_ISREG(st.st_mode)) {
+        ESP_LOGE(TAG, "stat %s: errno=%d", resolved_path, errno);
         cJSON_Delete(root);
         snprintf(output, output_size, "Error: file not found: %s", resolved_path);
         return ESP_ERR_NOT_FOUND;
-    }
-    if (st.st_size > (off_t)max_read) {
-        ESP_LOGE(TAG, "read_file rejected oversized file %s: %ld > %u bytes",
-                 resolved_path, (long)st.st_size, (unsigned)max_read);
-        cJSON_Delete(root);
-        snprintf(output,
-                 output_size,
-                 "Error: file too large: %s (%ld bytes > %u bytes max)",
-                 resolved_path,
-                 (long)st.st_size,
-                 (unsigned)max_read);
-        return ESP_ERR_INVALID_SIZE;
     }
 
     file = fopen(resolved_path, "rb");
     if (!file) {
+        ESP_LOGE(TAG, "fopen %s: errno=%d", resolved_path, errno);
         cJSON_Delete(root);
         snprintf(output, output_size, "Error: file not found: %s", resolved_path);
         return ESP_ERR_NOT_FOUND;
     }
 
+    /* Reserve room for a truncation notice instead of rejecting oversized documentation files. */
+    max_read = output_size - 1;
+    if (max_read > CAP_FILES_MAX_FILE_SIZE) {
+        max_read = CAP_FILES_MAX_FILE_SIZE;
+    }
+    will_truncate = (off_t)max_read < st.st_size;
+    if (will_truncate && max_read > CAP_FILES_TRUNCATION_SUFFIX_RESERVE) {
+        max_read -= CAP_FILES_TRUNCATION_SUFFIX_RESERVE;
+    }
+
     read_size = fread(output, 1, max_read, file);
     if (ferror(file)) {
+        ESP_LOGE(TAG, "fread %s: errno=%d", resolved_path, errno);
         fclose(file);
         cJSON_Delete(root);
         snprintf(output, output_size, "Error: failed to read file: %s", resolved_path);
@@ -340,6 +390,18 @@ static esp_err_t cap_files_read_file_execute(const char *input_json,
     output[read_size] = '\0';
     fclose(file);
     cJSON_Delete(root);
+
+    if ((off_t)read_size < st.st_size) {
+        ESP_LOGW(TAG, "read_file truncated path=%s read=%u total=%ld", resolved_path, (unsigned)read_size, (long)st.st_size);
+        suffix_len = strlen(output);
+        if (suffix_len < output_size - 1) {
+            snprintf(output + suffix_len,
+                     output_size - suffix_len,
+                     "\n[read_file truncated: read %u of %ld bytes]",
+                     (unsigned)read_size,
+                     (long)st.st_size);
+        }
+    }
     return ESP_OK;
 }
 
@@ -396,6 +458,7 @@ static esp_err_t cap_files_write_file_execute(const char *input_json,
     cJSON_Delete(root);
 
     if (written != content_len) {
+        ESP_LOGE(TAG, "fwrite %s: %d/%d bytes, errno=%d", resolved_path, (int)written, (int)content_len, errno);
         snprintf(output, output_size, "Error: wrote %d of %d bytes to %s",
                  (int)written,
                  (int)content_len,
@@ -439,6 +502,7 @@ static esp_err_t cap_files_delete_file_execute(const char *input_json,
     }
 
     if (unlink(resolved_path) != 0) {
+        ESP_LOGE(TAG, "unlink %s: errno=%d", resolved_path, errno);
         cJSON_Delete(root);
         snprintf(output, output_size, "Error: failed to delete file: %s", resolved_path);
         return ESP_FAIL;
@@ -545,14 +609,20 @@ static esp_err_t cap_files_move_file_execute(const char *input_json,
     }
 
     if (rename(resolved_src_path, resolved_dst_path) != 0) {
-        esp_err_t err = cap_files_copy_file_internal(resolved_src_path, resolved_dst_path);
+        esp_err_t err;
+
+        /* rename() across mount points is not supported; fall back to copy+delete */
+        ESP_LOGW(TAG, "rename errno=%d, fallback copy: %s -> %s", errno, resolved_src_path, resolved_dst_path);
+        err = cap_files_copy_file_internal(resolved_src_path, resolved_dst_path);
 
         if (err != ESP_OK) {
+            ESP_LOGE(TAG, "copy failed: %s -> %s", resolved_src_path, resolved_dst_path);
             cJSON_Delete(root);
             snprintf(output, output_size, "Error: failed to move %s to %s", resolved_src_path, resolved_dst_path);
             return err;
         }
         if (unlink(resolved_src_path) != 0) {
+            ESP_LOGE(TAG, "unlink src %s: errno=%d", resolved_src_path, errno);
             unlink(resolved_dst_path);
             cJSON_Delete(root);
             snprintf(output, output_size, "Error: failed to remove source after moving: %s", resolved_src_path);
@@ -571,9 +641,7 @@ static esp_err_t cap_files_list_dir_execute(const char *input_json,
                                             size_t output_size)
 {
     cJSON *root = NULL;
-    const char *prefix_value = NULL;
-    char resolved_prefix[256];
-    const char *prefix = NULL;
+    const char *keyword = NULL;
     size_t offset = 0;
     int count = 0;
     esp_err_t err;
@@ -583,16 +651,7 @@ static esp_err_t cap_files_list_dir_execute(const char *input_json,
     output[0] = '\0';
     root = cJSON_Parse(input_json);
     if (root) {
-        prefix_value = cJSON_GetStringValue(cJSON_GetObjectItem(root, "prefix"));
-    }
-
-    if (prefix_value && prefix_value[0]) {
-        if (cap_files_resolve_path(prefix_value, resolved_prefix, sizeof(resolved_prefix)) != ESP_OK) {
-            cJSON_Delete(root);
-            snprintf(output, output_size, "Error: prefix must stay under %s", s_files_base_dir);
-            return ESP_ERR_INVALID_ARG;
-        }
-        prefix = resolved_prefix;
+        keyword = cJSON_GetStringValue(cJSON_GetObjectItem(root, "keyword"));
     }
 
     if (cap_files_ensure_dir(s_files_base_dir) != ESP_OK) {
@@ -601,9 +660,10 @@ static esp_err_t cap_files_list_dir_execute(const char *input_json,
         return ESP_FAIL;
     }
 
-    err = cap_files_list_recursive(s_files_base_dir, prefix, output, output_size, &offset, &count);
+    err = cap_files_list_recursive(s_files_base_dir, keyword, output, output_size, &offset, &count);
     cJSON_Delete(root);
     if (err != ESP_OK) {
+        ESP_LOGE(TAG, "list %s: err=0x%x", s_files_base_dir, err);
         snprintf(output, output_size, "Error: failed to list files under %s", s_files_base_dir);
         return err;
     }
@@ -669,10 +729,10 @@ static const claw_cap_descriptor_t s_files_descriptors[] = {
         .id = "list_dir",
         .name = "list_dir",
         .family = "files",
-        .description = "Recursively list files, optionally filtered by prefix.",
+        .description = "Recursively list files, optionally filtered by case-insensitive path keyword.",
         .kind = CLAW_CAP_KIND_CALLABLE,
         .cap_flags = CLAW_CAP_FLAG_CALLABLE_BY_LLM,
-        .input_schema_json = "{\"type\":\"object\",\"properties\":{\"prefix\":{\"type\":\"string\"}}}",
+        .input_schema_json = "{\"type\":\"object\",\"properties\":{\"keyword\":{\"type\":\"string\"}}}",
         .execute = cap_files_list_dir_execute,
     },
 };
@@ -686,6 +746,7 @@ static const claw_cap_group_t s_files_group = {
 esp_err_t cap_files_register_group(void)
 {
     if (s_files_base_dir[0] == '\0') {
+        ESP_LOGE(TAG, "base_dir not set");
         return ESP_ERR_INVALID_STATE;
     }
     if (claw_cap_group_exists(s_files_group.group_id)) {
@@ -698,6 +759,7 @@ esp_err_t cap_files_register_group(void)
 esp_err_t cap_files_set_base_dir(const char *base_dir)
 {
     if (!base_dir || !base_dir[0] || base_dir[0] != '/') {
+        ESP_LOGE(TAG, "invalid base_dir=%s", base_dir ? base_dir : "(null)");
         return ESP_ERR_INVALID_ARG;
     }
 

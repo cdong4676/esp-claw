@@ -1,4 +1,4 @@
-import { Show, type Component } from 'solid-js';
+import { createSignal, Show, type Component } from 'solid-js';
 import { t } from '../i18n';
 import type { AppConfig } from '../api/client';
 import { createConfigTab } from '../state/configTab';
@@ -8,25 +8,35 @@ import { StaticConfigBlock } from '../components/ui/ConfigBlocks';
 import { TextInput } from '../components/ui/FormField';
 import { SavePanel } from '../components/ui/SavePanel';
 import { Banner } from '../components/ui/Banner';
+import { RestartConfirmModal } from '../components/system/RestartConfirmModal';
 
 type SearchForm = {
   search_brave_key: string;
   search_tavily_key: string;
+  search_http_allowlist: string;
 };
 
-export const SearchPage: Component = () => {
+export const SearchPage: Component<{ onRestartRequest: () => void }> = (props) => {
   const tab = createConfigTab<SearchForm>({
     tab: 'search',
     groups: ['search'],
     toForm: (config: Partial<AppConfig>) => ({
       search_brave_key: config.search_brave_key ?? '',
       search_tavily_key: config.search_tavily_key ?? '',
+      search_http_allowlist: config.search_http_allowlist ?? '',
     }),
     fromForm: (form) => ({
       search_brave_key: form.search_brave_key.trim(),
       search_tavily_key: form.search_tavily_key.trim(),
+      search_http_allowlist: form.search_http_allowlist.trim(),
     }),
   });
+  const [confirmOpen, setConfirmOpen] = createSignal(false);
+
+  const handleSave = async () => {
+    await tab.save();
+    setConfirmOpen(true);
+  };
 
   return (
     <TabShell>
@@ -54,15 +64,30 @@ export const SearchPage: Component = () => {
               value={tab.form.search_tavily_key}
               onInput={(event) => tab.setForm('search_tavily_key', event.currentTarget.value)}
             />
+            <TextInput
+              label={t('searchHttpAllowlist')}
+              placeholder={t('searchHttpAllowlistPlaceholder') as string}
+              value={tab.form.search_http_allowlist}
+              onInput={(event) => tab.setForm('search_http_allowlist', event.currentTarget.value)}
+            />
           </div>
         </StaticConfigBlock>
       </div>
       <SavePanel
         dirty={tab.dirty()}
         saving={tab.saving()}
-        onSave={() => tab.save().catch(() => undefined)}
+        onSave={() => handleSave().catch(() => undefined)}
         onDiscard={tab.discard}
         note={t('restartHint') as string}
+      />
+      <RestartConfirmModal
+        open={confirmOpen()}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          props.onRestartRequest();
+        }}
+        subtitle={t('restartHint') as string}
       />
     </TabShell>
   );

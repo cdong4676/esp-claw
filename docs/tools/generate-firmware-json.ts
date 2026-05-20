@@ -13,15 +13,19 @@ type MetadataRecord = {
   brand?: unknown;
   board_brand?: unknown;
   board?: unknown;
+  console_output?: unknown;
   merged_binary?: unknown;
   min_flash_size?: unknown;
+  min_psram_size?: unknown;
   nvs_info?: unknown;
 };
+
+type FirmwareBinaryLinks = Record<string, string>;
 
 type FirmwareEntry = {
   features: string[];
   description: string;
-  merged_binary: string;
+  merged_binary: FirmwareBinaryLinks;
   min_flash_size: number;
   min_psram_size: number;
   nvs_info: {
@@ -91,6 +95,13 @@ function parseRevision(value: unknown): number | null {
 
 function makeChipSelectorKey(chip: string, rev: number | null): string {
   return rev == null ? chip : `${chip}|rev${rev}`;
+}
+
+function parseConsoleOutput(value: unknown): string {
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+  return "unknown";
 }
 
 async function loadMetadataFiles(mergedDir: string): Promise<MetadataRecord[]> {
@@ -180,6 +191,7 @@ async function main(): Promise<number> {
     const rev = record.rev;
     const brand = record.brand ?? record.board_brand ?? "others";
     const board = record.board;
+    const consoleOutput = parseConsoleOutput(record.console_output);
     const mergedBinary = record.merged_binary;
     const minFlashSize = record.min_flash_size;
     const nvsInfo = record.nvs_info;
@@ -206,9 +218,13 @@ async function main(): Promise<number> {
     }
 
     let minFlashMB: number;
+    let minPsramMB: number = 8;
     let revision: number | null;
     try {
       minFlashMB = parseFlashMB(minFlashSize);
+      if (record.min_psram_size !== undefined) {
+        minPsramMB = parseFlashMB(record.min_psram_size);
+      }
       revision = parseRevision(rev);
     } catch (error) {
       log(`skip one metadata: invalid metadata (${JSON.stringify(record)}) (${(error as Error).message})`);
@@ -219,9 +235,11 @@ async function main(): Promise<number> {
     const item: FirmwareEntry = {
       features: [],
       description: "",
-      merged_binary: `/merged_binary/${mergedBinary}`,
+      merged_binary: {
+        [consoleOutput]: `/merged_binary/${mergedBinary}`,
+      },
       min_flash_size: minFlashMB,
-      min_psram_size: 8,
+      min_psram_size: minPsramMB,
       nvs_info: {
         start_addr: String(nvsInfoRecord.start_addr ?? ""),
         size: String(nvsInfoRecord.size ?? ""),
@@ -238,6 +256,13 @@ async function main(): Promise<number> {
     if (!firmware[chipKey][brandKey]) {
       firmware[chipKey][brandKey] = {};
     }
+
+    const existing = firmware[chipKey][brandKey][boardKey];
+    if (existing) {
+      existing.merged_binary[consoleOutput] = item.merged_binary[consoleOutput];
+      continue;
+    }
+
     firmware[chipKey][brandKey][boardKey] = item;
   }
 
@@ -254,7 +279,13 @@ async function main(): Promise<number> {
       const boards = brands[brandKey];
       const sortedBoards: FirmwareBoards = {};
       for (const boardKey of Object.keys(boards).sort((a, b) => a.localeCompare(b))) {
-        sortedBoards[boardKey] = boards[boardKey];
+        const board = boards[boardKey];
+        sortedBoards[boardKey] = {
+          ...board,
+          merged_binary: Object.fromEntries(
+            Object.entries(board.merged_binary).sort(([left], [right]) => left.localeCompare(right)),
+          ),
+        };
       }
       sortedBrands[brandKey] = sortedBoards;
     }

@@ -19,57 +19,59 @@ Skills 存放在文件系统中，默认路径为 `/fatfs/skills`。你可以通
 <FileTree>
 - fatfs
   - skills
-    - **skills_list.json** 储存 Skills 列表及元数据
-    - cap_im_qq.md QQ IM 能力用法的 Skill
-    - cap_lua_run.md Lua 脚本执行的 Skill
-    - cap_scheduler.md 定时调度器用法的 Skill
-    - cap_router_mgr.md Event Router 规则管理的 Skill
-    - lua_module_gpio.md Lua GPIO 模块用法的 Skill
+    - cap_im_qq
+      - **SKILL.md** QQ IM 能力用法的 Skill
+    - cap_lua
+      - **SKILL.md** Lua 脚本执行的 Skill
+    - light_switch
+      - **SKILL.md**
+      - scripts
+        - led_strip_switch.lua
+    - builtin_lua_modules
+      - **SKILL.md** 内置 Lua 模块索引
     - ...
 </FileTree>
 
 <Aside type="tip">
-  各 `cap_*` 与 `lua_module_*` 组件自带的 Skill 文件位于组件源码的 `skills/` 目录下，构建时会被打包到 FATFS 镜像中。
+  各 `cap_*`、`lua_module_*` 与 `lua_driver_*` 组件自带的 Skill 文件位于组件源码的 `skills/` 目录下，构建时会被打包到 FATFS 镜像中。
 </Aside>
 
-### 列表与元数据
+### 元数据
 
-与 Claude 的 Agent Skills 相比，ESP-Claw 的 Skills 不支持在 Markdown YAML Header 中定义 Skills 的属性。所有的元数据需要在 `skills_list.json` 中提供。
+ESP-Claw 从每个 Skill 的 `SKILL.md` JSON frontmatter 读取元数据。目录名、`name` 与构建后路径必须保持一致：`skills/<skill_id>/SKILL.md`。
 
 <details>
-<summary>`skills_list.json` 格式</summary>
-```jsonc
+<summary>`SKILL.md` frontmatter 格式</summary>
+````md
+---
 {
-  "skills": <{"id": "string", "file": "string", "summary": "string", "cap_groups"?: "string[]"}[]>
+  "name": "skill_id",
+  "description": "Short capability description.",
+  "metadata": {
+    "cap_groups": ["cap_lua"],
+    "manage_mode": "readonly"
+  }
 }
-```
+---
+
+# Skill Title
+````
 </details>
 
-```jsonc
-{
-  "skills": [
-    {
-      "id": "cap_lua_run",          // <- Skill 的唯一标识符
-      "file": "cap_lua_run.md",     // <- Skill 的文件名
-      "summary": "Describes how to correctly use Lua scripts.", // <- Skill 的摘要
-      "cap_groups": ["cap_lua"]     // <- 可选：激活此 Skill 时同步开放的 Capability Group
-    },
-    ...
-  ]
-}
-```
+其中 `name` 是模型可见的 Skill ID，`description` 是模型可见的摘要。
 
-其中 `id` 与 `summary` 对应模型可见的 Skills 清单中的 Skill ID 与摘要。
+`metadata.manage_mode` 取值为 `readonly`、`web` 或 `runtime`。
+Skills Lab 侧的项目通常使用 `web`；在设备上 `web` 在管理语义上与 `readonly` 等价。由运行时注册的 Skill 使用 `runtime`。
 
-`cap_groups` 是可选字段，指定一个 Capability Group ID 列表。当该 Skill 被激活时，列表中的 Group 会自动对 LLM 可见（开放相应工具）；当该 Skill 被停用后，这些 Group 不再被纳入该 Skill 的可见集合。这一机制将「工具用法文档」与「工具本身」绑定在同一个 Skill 的生命周期内，避免大模型在不了解用法时就能访问工具。
+`metadata.cap_groups` 是可选字段，指定一个 Capability Group ID 列表。当该 Skill 被激活时，列表中的 Group 会自动对 LLM 可见（开放相应工具）；当该 Skill 被停用后，这些 Group 不再被纳入该 Skill 的可见集合。这一机制将「工具用法文档」与「工具本身」绑定在同一个 Skill 的生命周期内，避免大模型在不了解用法时就能访问工具。
 
 <Aside type="tip">
-  `cap_groups` 中填写的值对应 `claw_cap_group_info_t.id`，即各 Capability Group 注册时使用的 ID（如 `cap_lua`、`cap_im_qq` 等）。
+  `metadata.cap_groups` 中填写的值对应 `claw_cap_group_info_t.id`，即各 Capability Group 注册时使用的 ID（如 `cap_lua`、`cap_im_qq` 等）。
 </Aside>
 
 ### Skill 文件
 
-Skill 文件格式类似普通的 Markdown 文件。在 Skill 文件中，你需要详细提供「技能」——工具用法、工作流程、最佳实践、指导原则等。例如：
+`SKILL.md` 的正文格式类似普通的 Markdown 文件。在 Skill 文件中，你需要详细提供「技能」——工具用法、工作流程、最佳实践、指导原则等。例如：
 
 <Code lang="md" title="weather.md" code={exampleSkill} />
 
@@ -120,7 +122,7 @@ Skill 的 `.md` 文件会在 LLM 激活后注入对话上下文，内容应面�
 
 #### Lua 模块 Skill 的写法
 
-`lua_module_*` 的 Skill 面向「LLM 编写 Lua 代码」的场景，与 `cap_*` Skill 的 JSON 调用示例不同，应提供精确的 API 参考：
+`lua_module_*` / `lua_driver_*` 的 Skill 面向「LLM 编写 Lua 代码」的场景，与 `cap_*` Skill 的 JSON 调用示例不同，应提供精确的 API 参考：
 
 **lua_module Skill 文档应包含：**
 
@@ -169,28 +171,7 @@ Returns the current LED state.
 
 ### 一个 Skill 还是多个 Skill？
 
-若 Capability 功能复杂、存在多个独立使用场景，可以拆分为多个 Skill，各自绑定相同的 Group：
-
-```jsonc
-{
-  "skills": [
-    {
-      "id": "my_feature_basic",
-      "file": "my_feature_basic.md",
-      "summary": "基础用法：执行简单动作",
-      "cap_groups": ["cap_my_feature"]
-    },
-    {
-      "id": "my_feature_advanced",
-      "file": "my_feature_advanced.md",
-      "summary": "高级用法：批量操作与错误恢复",
-      "cap_groups": ["cap_my_feature"]
-    }
-  ]
-}
-```
-
-这样 LLM 在简单任务时只激活 Basic Skill，保持上下文精简；复杂任务时再激活 Advanced Skill 获取完整指引。
+尽量保持使用一个 Skill 描述清楚，除非 Capability 功能复杂、存在多个独立使用场景，可以拆分为多个 Skill。
 
 ## 由 Agent 增删和修改 Skills
 
@@ -209,7 +190,7 @@ ask "把之前查询某地天气的技能总结一下"
 Skills 是一种渐进式向大模型披露能力的机制。在初始状态下，大语言模型只会「看到」Skills 清单与每个 Skill 的摘要。
 当模型认为某个 Skill 是当前工作所需的，模型会主动激活该 Skill，获取该 Skill 的完整文档。
 
-若 Skill 配置了 `cap_groups`，激活时系统还会同步开放对应的 Capability Group，使 LLM 能立即调用相关工具，无需额外手动启用。任务完成后，模型可调用 `deactivate_skill` 停用 Skill，相关 Group 也随之退出该 Skill 的可见集，保持上下文精简。
+若 Skill 配置了 `metadata.cap_groups`，激活时系统还会同步开放对应的 Capability Group，使 LLM 能立即调用相关工具，无需额外手动启用。任务完成后，模型可调用 `deactivate_skill` 停用 Skill，相关 Group 也随之退出该 Skill 的可见集，保持上下文精简。
 
 <Aside type="tip">
   查阅 [Claude 文档](https://platform.claude.com/docs@lang/agents-and-tools/agent-skills/overview#how-skills-work)以了解 Skill 的更多细节。
